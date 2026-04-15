@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Model Editor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #252526;
+      --bg-tertiary: #2d2d2d;
+      --bg-hover: #37373d;
+      --border-color: #3e3e42;
+      --text-primary: #cccccc;
+      --text-secondary: #858585;
+      --accent: #0078d4;
+      --accent-hover: #1a8cff;
+      --danger: #f44747;
+      --panel-width: 260px;
+      --toolbar-height: 48px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      height: var(--toolbar-height);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .toolbar-section {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .toolbar-section+.toolbar-section {
+      margin-left: 12px;
+      padding-left: 12px;
+      border-left: 1px solid var(--border-color);
+    }
+
+    .toolbar-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-right: 4px;
+    }
+
+    .toolbar-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .toolbar-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .toolbar-btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .toolbar-btn.primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .toolbar-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    /* Main Layout */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .left-panel,
+    .right-panel {
+      width: var(--panel-width);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+      overflow-y: auto;
+    }
+
+    .left-panel {
+      border-right: 1px solid var(--border-color);
+    }
+
+    .right-panel {
+      border-left: 1px solid var(--border-color);
+    }
+
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      background: var(--bg-primary);
+    }
+
+    /* Panels */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-header h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+
+    .panel-content {
+      padding: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px 12px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state p {
+      font-size: 13px;
+    }
+
+    .empty-state .hint {
+      font-size: 11px;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
+    /* Hierarchy */
+    .hierarchy-list {
+      list-style: none;
+    }
+
+    .hierarchy-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .hierarchy-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .hierarchy-item.selected {
+      background: rgba(0, 120, 212, 0.2);
+      outline: 1px solid var(--accent);
+    }
+
+    .item-icon {
+      font-size: 12px;
+    }
+
+    .item-name {
+      flex: 1;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .hierarchy-item:hover .item-actions {
+      opacity: 1;
+    }
+
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .icon-btn.danger:hover {
+      background: rgba(244, 71, 71, 0.2);
+      color: var(--danger);
+    }
+
+    /* Inspector */
+    .inspector-section {
+      margin-bottom: 12px;
+    }
+
+    .inspector-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .inspector-input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .inspector-input:focus {
+      border-color: var(--accent);
+    }
+
+    .vector-input {
+      display: flex;
+      gap: 4px;
+    }
+
+    .axis-input {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .axis-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .axis-input input {
+      width: 100%;
+      padding: 4px 6px;
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 12px;
+      outline: none;
+      text-align: center;
+    }
+
+    .axis-input input:focus {
+      border-color: var(--accent);
+    }
+
+    .color-input {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .color-input input[type="color"] {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 2px;
+      background: var(--bg-primary);
+    }
+
+    /* Save/Load */
+    .save-section {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .save-section input {
+      flex: 1;
+    }
+
+    .scenes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .scene-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: var(--bg-tertiary);
+    }
+
+    .scene-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+
+    .scene-name {
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scene-date {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .scene-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .toolbar-btn.small {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .toolbar-btn.danger {
+      color: var(--danger);
+    }
+
+    .toolbar-btn.danger:hover {
+      background: rgba(244, 71, 71, 0.15);
+    }
+
+    /* Loading */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Color Palette */
+    .color-palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+
+    .color-swatch:hover {
+      border-color: var(--accent);
+      transform: scale(1.15);
+    }
+
+    .color-swatch.active {
+      border-color: white;
+    }
+
+    /* Slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--bg-primary);
+      outline: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+
+    .slider-val {
+      font-size: 11px;
+      color: var(--text-secondary);
+      min-width: 30px;
+      text-align: right;
+    }
+
+    /* Mesh Parts */
+    .mesh-parts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .mesh-part-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-size: 12px;
+    }
+
+    .mesh-part-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .mesh-part-item.selected {
+      background: rgba(0, 120, 212, 0.2);
+      outline: 1px solid var(--accent);
+    }
+
+    .mesh-part-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .mesh-part-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* AI Panel */
+    .ai-section {
+      margin-bottom: 10px;
+    }
+
+    .ai-textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 6px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+    }
+
+    .ai-textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .ai-select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .ai-select:focus {
+      border-color: var(--accent);
+    }
+
+    .ai-upload-area {
+      border: 2px dashed var(--border-color);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .ai-upload-area:hover {
+      border-color: var(--accent);
+    }
+
+    .ai-upload-area span {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .ai-preview {
+      max-width: 100%;
+      max-height: 120px;
+      border-radius: 4px;
+    }
+
+    .ai-status {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+    }
+
+    .ai-status.loading {
+      color: var(--accent);
+    }
+
+    .ai-status.error {
+      color: var(--danger);
+    }
+
+    .ai-status.success {
+      color: #4ec9b0;
+    }
+
+    .full-width {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .ai-progress {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-primary);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .ai-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-secondary);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+      <div class="loading-spinner"></div>
+      <span>Loading...</span>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-section">
+        <button class="toolbar-btn primary" id="btnImport">📂 Import</button>
+        <input type="file" id="fileInput" accept=".glb,.gltf,.obj,.stl" multiple style="display:none" />
+        <button class="toolbar-btn" id="btnExport">💾 Export GLB</button>
+        <button class="toolbar-btn" id="btnSave">📋 Save Scene</button>
+      </div>
+      <div class="toolbar-section">
+        <span class="toolbar-label">Create:</span>
+        <button class="toolbar-btn" id="btnAddCube" title="Add Cube">◼ Cube</button>
+        <button class="toolbar-btn" id="btnAddSphere" title="Add Sphere">● Sphere</button>
+        <button class="toolbar-btn" id="btnAddCylinder" title="Add Cylinder">◎ Cylinder</button>
+        <button class="toolbar-btn" id="btnAddPlane" title="Add Plane">▭ Plane</button>
+        <button class="toolbar-btn" id="btnAddTorus" title="Add Torus">◎ Torus</button>
+        <button class="toolbar-btn" id="btnAddCone" title="Add Cone">△ Cone</button>
+      </div>
+      <div class="toolbar-section">
+        <span class="toolbar-label">Transform:</span>
+        <button class="toolbar-btn active" data-mode="translate">✥ Move</button>
+        <button class="toolbar-btn" data-mode="rotate">↻ Rotate</button>
+        <button class="toolbar-btn" data-mode="scale">⤢ Scale</button>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Left Panel -->
+      <div class="left-panel">
+        <!-- Hierarchy -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Hierarchy</h3>
+          </div>
+          <div class="panel-content">
+            <div id="hierarchyEmpty" class="empty-state">
+              <p>No objects in scene</p>
+              <p class="hint">Import a model to get started</p>
+            </div>
+            <ul id="hierarchyList" class="hierarchy-list"></ul>
+          </div>
+        </div>
+        <!-- AI Assistant -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>🤖 AI Assistant</h3>
+          </div>
+          <div class="panel-content">
+            <div class="ai-section">
+              <label class="inspector-label">AI Model (Free - No Signup)</label>
+              <select class="ai-select" id="aiModel">
+                <option value="openai">OpenAI GPT-4o-mini</option>
+                <option value="mistral">Mistral Medium</option>
+                <option value="llama">Llama 3.1 405B</option>
+                <option value="claude">Claude 3.5 Sonnet</option>
+                <option value="gemini">Gemini 2.0 Flash</option>
+              </select>
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Powered by Pollinations.ai - 100%
+                free, no API key needed</div>
+            </div>
+            <div class="ai-section">
+              <label class="inspector-label">Describe your model</label>
+              <textarea class="ai-textarea" id="aiPrompt"
+                placeholder="e.g. A red sports car with sleek curves..."></textarea>
+            </div>
+            <div class="ai-section">
+              <label class="inspector-label">Upload Reference Image</label>
+              <div class="ai-upload-area" id="aiUploadArea">
+                <input type="file" id="aiImageInput" accept="image/*" style="display:none" />
+                <div id="aiUploadPlaceholder">
+                  <span>📷 Click or drag image here</span>
+                </div>
+                <img id="aiPreviewImage" class="ai-preview hidden" />
+                <button class="toolbar-btn small danger hidden" id="aiRemoveImage">✕ Remove</button>
+              </div>
+            </div>
+            <div class="ai-section">
+              <label class="inspector-label">Model Type</label>
+              <select class="ai-select" id="aiModelType">
+                <option value="car">🚗 Car</option>
+                <option value="building">🏢 Building</option>
+                <option value="character">🧑 Character</option>
+                <option value="furniture">🪑 Furniture</option>
+                <option value="nature">🌳 Nature</option>
+                <option value="weapon">⚔️ Weapon</option>
+                <option value="vehicle">🚀 Vehicle</option>
+                <option value="abstract">🎨 Abstract</option>
+                <option value="custom">✨ Custom</option>
+              </select>
+            </div>
+            <div class="ai-section">
+              <label class="inspector-label">Quality</label>
+              <select class="ai-select" id="aiQuality">
+                <option value="low">Draft (Fast)</option>
+                <option value="medium" selected>Standard</option>
+                <option value="high">High Quality (Slow)</option>
+              </select>
+            </div>
+            <button class="toolbar-btn primary full-width" id="btnAiGenerate">🤖 Generate 3D Model</button>
+            <div id="aiStatus" class="ai-status hidden"></div>
+          </div>
+        </div>
+        <!-- Scenes -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Scenes</h3>
+          </div>
+          <div class="panel-content">
+            <div class="save-section">
+              <input type="text" class="inspector-input" id="sceneNameInput" placeholder="Scene name..." />
+              <button class="toolbar-btn primary" id="btnSaveScene">💾 Save</button>
+            </div>
+            <div id="scenesList" class="scenes-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Viewport -->
+      <div class="viewport-container" id="viewport"></div>
+
+      <!-- Right Panel (Inspector) -->
+      <div class="right-panel">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Inspector</h3>
+          </div>
+          <div class="panel-content" id="inspectorContent">
+            <div id="inspectorEmpty" class="empty-state">
+              <p>No object selected</p>
+              <p class="hint">Click an object to inspect it</p>
+            </div>
+            <div id="inspectorFields" class="hidden">
+              <!-- Name -->
+              <div class="inspector-section">
+                <label class="inspector-label">Name</label>
+                <input type="text" class="inspector-input" id="inputName" />
+              </div>
+              <!-- Position -->
+              <div class="inspector-section">
+                <label class="inspector-label">Position</label>
+                <div class="vector-input">
+                  <div class="axis-input"><span class="axis-label">X</span><input type="number" step="0.1" id="posX" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Y</span><input type="number" step="0.1" id="posY" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Z</span><input type="number" step="0.1" id="posZ" />
+                  </div>
+                </div>
+              </div>
+              <!-- Rotation -->
+              <div class="inspector-section">
+                <label class="inspector-label">Rotation (degrees)</label>
+                <div class="vector-input">
+                  <div class="axis-input"><span class="axis-label">X</span><input type="number" step="1" id="rotX" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Y</span><input type="number" step="1" id="rotY" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Z</span><input type="number" step="1" id="rotZ" />
+                  </div>
+                </div>
+              </div>
+              <!-- Scale -->
+              <div class="inspector-section">
+                <label class="inspector-label">Scale</label>
+                <div class="vector-input">
+                  <div class="axis-input"><span class="axis-label">X</span><input type="number" step="0.1" id="sclX" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Y</span><input type="number" step="0.1" id="sclY" />
+                  </div>
+                  <div class="axis-input"><span class="axis-label">Z</span><input type="number" step="0.1" id="sclZ" />
+                  </div>
+                </div>
+              </div>
+              <!-- Color -->
+              <div class="inspector-section">
+                <label class="inspector-label">Color</label>
+                <div class="color-input">
+                  <input type="color" id="inputColor" value="#888888" />
+                  <input type="text" class="inspector-input" id="inputColorHex" value="#888888" />
+                </div>
+              </div>
+              <!-- Color Palette -->
+              <div class="inspector-section">
+                <label class="inspector-label">Color Palette</label>
+                <div class="color-palette" id="colorPalette"></div>
+              </div>
+              <!-- Recent Colors -->
+              <div class="inspector-section">
+                <label class="inspector-label">Recent Colors</label>
+                <div class="color-palette" id="recentColors"></div>
+              </div>
+              <!-- Material Properties -->
+              <div class="inspector-section">
+                <label class="inspector-label">Metalness</label>
+                <div class="slider-row">
+                  <input type="range" id="inputMetalness" min="0" max="1" step="0.01" value="0" class="slider" />
+                  <span id="metalnessVal" class="slider-val">0.00</span>
+                </div>
+              </div>
+              <div class="inspector-section">
+                <label class="inspector-label">Roughness</label>
+                <div class="slider-row">
+                  <input type="range" id="inputRoughness" min="0" max="1" step="0.01" value="0.5" class="slider" />
+                  <span id="roughnessVal" class="slider-val">0.50</span>
+                </div>
+              </div>
+              <div class="inspector-section">
+                <label class="inspector-label">Opacity</label>
+                <div class="slider-row">
+                  <input type="range" id="inputOpacity" min="0" max="1" step="0.01" value="1" class="slider" />
+                  <span id="opacityVal" class="slider-val">1.00</span>
+                </div>
+              </div>
+              <!-- Mesh Parts -->
+              <div class="inspector-section">
+                <label class="inspector-label">Mesh Parts</label>
+                <div id="meshPartsList" class="mesh-parts-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    // ─── State ───────────────────────────────────────────────
+    const state = {
+      objects: {},        // id -> { id, name, position, rotation, scale, color, visible }
+      rootIds: [],
+      meshes: {},         // id -> THREE.Group
+      selectedId: null,
+      transformMode: 'translate',
+      sceneName: 'Untitled Scene',
+      sceneId: crypto.randomUUID(),
+    };
+
+    // ─── Three.js Setup ──────────────────────────────────────
+    const container = document.getElementById('viewport');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x1e1e1e);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    camera.position.set(5, 5, 5);
+
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.05;
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight1.position.set(10, 10, 5);
+    dirLight1.castShadow = true;
+    scene.add(dirLight1);
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+    dirLight2.position.set(-10, -10, -5);
+    scene.add(dirLight2);
+
+    // Grid
+    const grid = new THREE.GridHelper(50, 50, 0x9d4b4b, 0x6f6f6f);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.5;
+    scene.add(grid);
+
+    // TransformControls
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.addEventListener('dragging-changed', (e) => {
+      orbitControls.enabled = !e.value;
+    });
+    transformControls.addEventListener('objectChange', () => {
+      if (!state.selectedId) return;
+      const mesh = state.meshes[state.selectedId];
+      if (!mesh) return;
+      const obj = state.objects[state.selectedId];
+      obj.position = [mesh.position.x, mesh.position.y, mesh.position.z];
+      obj.rotation = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
+      obj.scale = [mesh.scale.x, mesh.scale.y, mesh.scale.z];
+      updateInspector();
+    });
+    scene.add(transformControls);
+
+    // Raycaster for selection
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function onResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+    onResize();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      orbitControls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ─── Helpers ─────────────────────────────────────────────
+    function setLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
+    }
+
+    function generateId() {
+      return crypto.randomUUID();
+    }
+
+    // ─── Import ──────────────────────────────────────────────
+    function detectFormat(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (ext === 'glb') return 'glb';
+      if (ext === 'gltf') return 'gltf';
+      if (ext === 'obj') return 'obj';
+      if (ext === 'stl') return 'stl';
+      return null;
+    }
+
+    function loadModel(file) {
+      return new Promise((resolve, reject) => {
+        const format = detectFormat(file.name);
+        if (!format) return reject(new Error('Unsupported format: ' + file.name));
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const result = ev.target.result;
+          try {
+            if (format === 'glb' || format === 'gltf') {
+              new GLTFLoader().parse(result, '', (gltf) => {
+                const g = gltf.scene;
+                g.name = file.name.replace(/\.[^/.]+$/, '');
+                resolve(g);
+              }, reject);
+            } else if (format === 'obj') {
+              const text = typeof result === 'string' ? result : new TextDecoder().decode(result);
+              const g = new OBJLoader().parse(text);
+              g.name = file.name.replace(/\.[^/.]+$/, '');
+              resolve(g);
+            } else if (format === 'stl') {
+              const geo = new STLLoader().parse(result);
+              const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+              const mesh = new THREE.Mesh(geo, mat);
+              const g = new THREE.Group();
+              g.name = file.name.replace(/\.[^/.]+$/, '');
+              g.add(mesh);
+              resolve(g);
+            }
+          } catch (err) { reject(err); }
+        };
+        reader.onerror = () => reject(new Error('FileReader error'));
+        if (format === 'obj') reader.readAsText(file);
+        else reader.readAsArrayBuffer(file);
+      });
+    }
+
+    document.getElementById('btnImport').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      setLoading(true);
+      try {
+        for (const file of files) {
+          const mesh = await loadModel(file);
+          const id = generateId();
+          const obj = {
+            id,
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            color: '#888888',
+            visible: true,
+          };
+          state.objects[id] = obj;
+          state.rootIds.push(id);
+          state.meshes[id] = mesh;
+          scene.add(mesh);
+        }
+        refreshHierarchy();
+        autoSave();
+      } catch (err) {
+        alert('Import failed: ' + err.message);
+      } finally {
+        setLoading(false);
+        e.target.value = '';
+      }
+    });
+
+    // ─── Primitive Shapes ────────────────────────────────────
+    function addPrimitive(type) {
+      let geometry, name;
+      switch (type) {
+        case 'cube':
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+          name = 'Cube';
+          break;
+        case 'sphere':
+          geometry = new THREE.SphereGeometry(0.5, 32, 32);
+          name = 'Sphere';
+          break;
+        case 'cylinder':
+          geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+          name = 'Cylinder';
+          break;
+        case 'plane':
+          geometry = new THREE.PlaneGeometry(2, 2);
+          name = 'Plane';
+          break;
+        case 'torus':
+          geometry = new THREE.TorusGeometry(0.5, 0.2, 16, 48);
+          name = 'Torus';
+          break;
+        case 'cone':
+          geometry = new THREE.ConeGeometry(0.5, 1, 32);
+          name = 'Cone';
+          break;
+        default:
+          return;
+      }
+      const material = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0, roughness: 0.5 });
+      const mesh = new THREE.Mesh(geometry, material);
+      const group = new THREE.Group();
+      group.name = name;
+      group.add(mesh);
+      const id = generateId();
+      const obj = {
+        id,
+        name,
+        position: [0, 0.5, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: '#888888',
+        visible: true,
+        metalness: 0,
+        roughness: 0.5,
+        opacity: 1,
+      };
+      state.objects[id] = obj;
+      state.rootIds.push(id);
+      state.meshes[id] = group;
+      scene.add(group);
+      selectObject(id);
+      refreshHierarchy();
+      autoSave();
+    }
+
+    document.getElementById('btnAddCube').addEventListener('click', () => addPrimitive('cube'));
+    document.getElementById('btnAddSphere').addEventListener('click', () => addPrimitive('sphere'));
+    document.getElementById('btnAddCylinder').addEventListener('click', () => addPrimitive('cylinder'));
+    document.getElementById('btnAddPlane').addEventListener('click', () => addPrimitive('plane'));
+    document.getElementById('btnAddTorus').addEventListener('click', () => addPrimitive('torus'));
+    document.getElementById('btnAddCone').addEventListener('click', () => addPrimitive('cone'));
+
+    // ─── AI Model Generation ────────────────────────────────
+    let aiImageData = null;
+
+    function resolvePollinationsModel(input) {
+      var supported = ['openai', 'mistral', 'llama', 'claude', 'gemini'];
+      return supported.indexOf(input) >= 0 ? input : 'openai';
+    }
+
+    // Image upload
+    const aiUploadArea = document.getElementById('aiUploadArea');
+    const aiImageInput = document.getElementById('aiImageInput');
+
+    aiUploadArea.addEventListener('click', () => aiImageInput.click());
+    aiUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); aiUploadArea.style.borderColor = 'var(--accent)'; });
+    aiUploadArea.addEventListener('dragleave', () => { aiUploadArea.style.borderColor = ''; });
+    aiUploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      aiUploadArea.style.borderColor = '';
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) handleAiImage(file);
+    });
+
+    aiImageInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleAiImage(e.target.files[0]);
+    });
+
+    function handleAiImage(file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        aiImageData = ev.target.result;
+        document.getElementById('aiPreviewImage').src = aiImageData;
+        document.getElementById('aiPreviewImage').classList.remove('hidden');
+        document.getElementById('aiUploadPlaceholder').classList.add('hidden');
+        document.getElementById('aiRemoveImage').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('aiRemoveImage').addEventListener('click', (e) => {
+      e.stopPropagation();
+      aiImageData = null;
+      document.getElementById('aiPreviewImage').classList.add('hidden');
+      document.getElementById('aiUploadPlaceholder').classList.remove('hidden');
+      document.getElementById('aiRemoveImage').classList.add('hidden');
+      aiImageInput.value = '';
+    });
+
+    function showAiStatus(msg, type) {
+      const el = document.getElementById('aiStatus');
+      el.classList.remove('hidden', 'loading', 'error', 'success');
+      if (type) el.classList.add(type);
+      el.innerHTML = msg;
+    }
+
+    function hideAiStatus() {
+      document.getElementById('aiStatus').classList.add('hidden');
+    }
+
+    // AI Generate button
+    document.getElementById('btnAiGenerate').addEventListener('click', async () => {
+      const prompt = document.getElementById('aiPrompt').value.trim();
+      const modelType = document.getElementById('aiModelType').value;
+      const quality = document.getElementById('aiQuality').value;
+      const aiModel = document.getElementById('aiModel').value;
+
+      if (!prompt && !aiImageData) {
+        showAiStatus('⚠️ Please enter a description or upload an image', 'error');
+        return;
+      }
+
+      showAiStatus('🤖 Generating 3D model... This may take a moment.<div class="ai-progress"><div class="ai-progress-bar" style="width:10%"></div></div>', 'loading');
+
+      try {
+        const systemPrompt = `You are a professional 3D model generation assistant. Generate advanced, high-quality Three.js code to create a complex, detailed 3D model based on the user's description.
+
+**Code Requirements:**
+1. **Structure:** The code must create and return a single, named THREE.Group variable as its final statement. Do not use a function wrapper.
+2. **Geometry Variety:** Utilize a diverse set of built-in Three.js geometries (e.g., BoxGeometry, SphereGeometry, CylinderGeometry, TorusGeometry, ConeGeometry).
+3. **Advanced Materials:** Apply MeshStandardMaterial or MeshPhysicalMaterial with detailed properties:
+   - color: Use specific hex codes or color names.
+   - metalness and roughness: Set precise values for realism.
+   - emissive: For glowing parts, define emissive color and emissiveIntensity.
+   - transparent and opacity: For glass or translucent elements.
+   - Use side: THREE.DoubleSide where necessary.
+4. **Transformations & Hierarchy:** Position, rotate, and scale meshes accurately. Create a logical hierarchy using nested THREE.Group objects for complex models with moving parts.
+5. **Code Quality:**
+   - Use clear, descriptive variable names (e.g., carBodyGroup, wheelMesh).
+   - Add brief comments explaining complex sections or non-obvious calculations.
+   - Ensure the code is efficient and clean.
+6. **Output Format:** Return ONLY the raw JavaScript code. No markdown formatting, no explanations, no placeholders.
+7. **NO TYPESCRIPT:** Use ONLY plain JavaScript (ES5), NO type annotations like ": number" or ": string".
+
+**Example Structure:**
+// Main group for the entire model
+var modelGroup = new THREE.Group();
+
+// Car body
+var bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, metalness: 0.3, roughness: 0.4 });
+var bodyGeometry = new THREE.BoxGeometry(4, 1.5, 2);
+var bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+bodyMesh.position.y = 1.25;
+modelGroup.add(bodyMesh);
+
+// Wheel group
+var wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.1, roughness: 0.8 });
+var wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 24);
+var wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
+wheelMesh.rotation.x = Math.PI / 2;
+modelGroup.add(wheelMesh);
+
+modelGroup;
+
+Quality level: ${quality}. Model type: ${modelType}.`;
+
+        showAiStatus('🤖 Analyzing request...<div class="ai-progress"><div class="ai-progress-bar" style="width:25%"></div></div>', 'loading');
+
+        const userText = prompt || `Create a 3D model. Type: ${modelType}`;
+        const fullPrompt = systemPrompt + '\n\nUser request: ' + userText;
+
+        function wait(ms) {
+          return new Promise(function (resolve) { setTimeout(resolve, ms); });
+        }
+
+        function postPollinations(model, promptText, stage) {
+          var seed = Math.floor(Math.random() * 100000);
+          console.log('[AI][HTTP] stage=' + stage + ' model=' + model + ' seed=' + seed + ' promptLen=' + promptText.length);
+          return fetch('https://text.pollinations.ai/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: [
+                { role: 'user', content: promptText }
+              ],
+              model: model,
+              seed: seed,
+              jsonMode: false,
+            }),
+          }).then(function (response) {
+            console.log('[AI][HTTP] stage=' + stage + ' model=' + model + ' status=' + response.status + ' ok=' + response.ok, {
+              retryAfter: response.headers.get('retry-after'),
+              requestId: response.headers.get('x-request-id') || response.headers.get('request-id') || 'n/a'
+            });
+            return response;
+          });
+        }
+
+        showAiStatus('🤖 Sending to AI...<div class="ai-progress"><div class="ai-progress-bar" style="width:40%"></div></div>', 'loading');
+
+        // Pollinations.ai - completely free, no API key needed
+        const modelMap = {
+          'openai': 'openai',
+          'mistral': 'mistral',
+          'llama': 'llama',
+          'claude': 'claude',
+          'gemini': 'gemini'
+        };
+
+        var selectedModel = resolvePollinationsModel(aiModel);
+        var response = await postPollinations(selectedModel, fullPrompt, 'initial');
+
+        // 429 handling with exponential backoff and model fallback
+        if (response.status === 429) {
+          console.warn('[AI] 429 received, retrying...');
+          showAiStatus('⏳ AI is busy (429). Retrying in 2s...', 'loading');
+          await wait(2000);
+          response = await postPollinations(selectedModel, fullPrompt, 'retry-1');
+
+          if (response.status === 429) {
+            showAiStatus('⏳ Still rate-limited. Retrying in 4s...', 'loading');
+            await wait(4000);
+            response = await postPollinations(selectedModel, fullPrompt, 'retry-2');
+          }
+
+          if (response.status === 429 && selectedModel !== 'openai') {
+            console.warn('[AI] 429 persists, switching to openai fallback');
+            showAiStatus('🔁 Switching to fallback model...', 'loading');
+            await wait(1000);
+            response = await postPollinations('openai', fullPrompt, 'fallback-openai-after-429');
+          }
+        }
+
+        if (response.status === 404 && selectedModel !== 'openai') {
+          console.warn('[AI] 404 for model', selectedModel, '- retrying with openai');
+          response = await postPollinations('openai', fullPrompt, 'fallback-openai-after-404');
+        }
+
+        showAiStatus('🤖 Processing response...<div class="ai-progress"><div class="ai-progress-bar" style="width:70%"></div></div>', 'loading');
+
+        if (!response.ok) {
+          console.error('[AI][HTTP] Final non-ok response', {
+            status: response.status,
+            selectedModel: selectedModel,
+            modelType: modelType,
+            quality: quality,
+          });
+          if (response.status === 429) {
+            throw new Error('AI rate limit (429). Please wait 30-60 seconds and try again.');
+          }
+          throw new Error(`AI service error: ${response.status}. Please try again.`);
+        }
+
+        let code = await response.text();
+
+        // Clean up the code - remove markdown code blocks if present
+        code = code.replace(/```javascript\n?/g, '').replace(/```js\n?/g, '').replace(/```\n?/g, '').trim();
+
+        function assertExecutableJsOrThrow(inputCode, stage) {
+          var trimmed = (inputCode || '').trim();
+          var looksNarrative = /^(you\b|here\b|this\b|sure\b|i\b|the\b|thing\b|it\b)/i.test(trimmed);
+          var hasCodeSignals = /(THREE\.|new\s+THREE\.|\bvar\b|\blet\b|\bconst\b|\bfunction\b|modelGroup\b|return\b|;)/.test(trimmed);
+
+          if (!trimmed || looksNarrative || !hasCodeSignals) {
+            throw new Error('AI returned non-code content at ' + stage + '. Please retry.');
+          }
+
+          try {
+            new Function('THREE', trimmed + '\nreturn true;');
+          } catch (syntaxErr) {
+            throw new Error('AI returned invalid JavaScript at ' + stage + ': ' + syntaxErr.message);
+          }
+        }
+
+        function normalizeTopLevelReturn(inputCode, stage) {
+          var normalized = (inputCode || '').trim();
+          var before = normalized.substring(0, 180);
+
+          normalized = normalized.replace(/^\s*return\s+([\s\S]*?);?\s*$/i, '$1');
+          normalized = normalized.replace(/^```[a-zA-Z]*\n?/g, '').replace(/```$/g, '').trim();
+
+          var after = normalized.substring(0, 180);
+          if (before !== after) {
+            console.log('[AI][NORMALIZE] stage=' + stage + ' adjusted top-level return/wrappers', { before: before, after: after });
+          } else {
+            console.log('[AI][NORMALIZE] stage=' + stage + ' no-op', { head: after });
+          }
+
+          return normalized;
+        }
+
+        code = normalizeTopLevelReturn(code, 'initial');
+
+        // Try validation on initial response; route ALL initial validation failures through bounded recovery.
+        try {
+          assertExecutableJsOrThrow(code, 'initial-response');
+        } catch (initialValidationErr) {
+          var message = String((initialValidationErr && initialValidationErr.message) || '');
+          var looksTsSyntax =
+            message.indexOf("Unexpected token ':'") >= 0 ||
+            message.indexOf('Unexpected identifier') >= 0;
+          var looksNonCode = message.indexOf('non-code content') >= 0;
+
+          console.warn('[AI][PIPELINE] stage=initial-validation failed; entering bounded recovery', {
+            looksTsSyntax: looksTsSyntax,
+            looksNonCode: looksNonCode,
+            reason: message,
+          });
+
+          var cleanedPreview = cleanTypeScript(code);
+          try {
+            var normalizedCleaned = normalizeTopLevelReturn(cleanedPreview, 'initial-cleaned');
+            assertExecutableJsOrThrow(normalizedCleaned, 'initial-response-cleaned');
+            console.log('[AI][PIPELINE] stage=initial-recovery path=ts-clean success');
+            code = normalizedCleaned;
+          } catch (cleanedValidationErr) {
+            console.warn('[AI][PIPELINE] stage=initial-recovery path=ts-clean failed => rewrite-ladder', {
+              reason: String((cleanedValidationErr && cleanedValidationErr.message) || cleanedValidationErr),
+            });
+            code = await rewriteWithLadder(cleanedPreview, modelType);
+          }
+        }
+
+        // Two-stage executor: try raw first, then clean TS syntax only if needed
+        function cleanTypeScript(code) {
+          // Remove single-line comments
+          code = code.replace(/\/\/.*$/gm, '');
+          // Remove multi-line comments
+          code = code.replace(/\/\*[\s\S]*?\*\//g, '');
+          // Remove "as Type" assertions
+          code = code.replace(/\s+as\s+[A-Za-z_$][\w$.<>\[\]|]*/g, '');
+          // Remove typed function parameters: (x: number, y: string)
+          code = code.replace(/(\(|,)\s*([A-Za-z_$][\w$]*)\??\s*:\s*[^,)=]+/g, '$1 $2');
+          // Remove typed destructuring parameters: ({ a, b }: SomeType)
+          code = code.replace(/(\(|,)\s*(\{[^\}]*\}|\[[^\]]*\])\s*:\s*[^,)=]+/g, '$1 $2');
+          // Remove function return type annotations: function f(): T / (..): T =>
+          code = code.replace(/\)\s*:\s*[^\{=>;]+(\{|=>)/g, ')$1');
+          // Remove return type on arrow functions with expression body: (...): T => expr
+          code = code.replace(/\)\s*:\s*[^=;]+=>/g, ') =>');
+          // Remove TypeScript type annotations after identifiers (but not in object literals)
+          code = code.replace(/\b(var|let|const)\s+(\w+)\s*:\s*[^=;]+([=;])/g, '$1 $2$3');
+          code = code.replace(/function\s+(\w+)\s*\([^)]*\)\s*:\s*\w+/g, 'function $1()');
+          code = code.replace(/:\s*(number|string|boolean|any|void|null|undefined|THREE\.\w+)\s*([=;,)])/g, '$2');
+          // Remove class/interface-like property type lines: foo: Bar;
+          code = code.replace(/^\s*[A-Za-z_$][\w$]*\s*:\s*[^;\n]+;\s*$/gm, '');
+          // Remove access modifiers and readonly keywords used in TS classes
+          code = code.replace(/\b(public|private|protected|readonly)\s+/g, '');
+          // Remove generic type annotations
+          code = code.replace(/<\s*THREE\.\w+\s*>/g, '');
+          // Convert const/let to var
+          code = code.replace(/\bconst\b/g, 'var');
+          code = code.replace(/\blet\b/g, 'var');
+          // Remove interface/type declarations
+          code = code.replace(/interface\s+\w+\s*\{[\s\S]*?\}/g, '');
+          code = code.replace(/type\s+\w+\s*=[\s\S]*?;/g, '');
+          // Remove empty lines
+          code = code.replace(/^\s*[\r\n]/gm, '');
+          return code.trim();
+        }
+
+        showAiStatus('🤖 Building 3D model...<div class="ai-progress"><div class="ai-progress-bar" style="width:85%"></div></div>', 'loading');
+
+        // Execute the generated code with variable-name fallback
+        var modelGroup = null;
+
+        function findGroupVariable(code) {
+          // Find all variable declarations that might be a THREE.Group
+          var varPattern = /\b(var|let|const)\s+(\w+)\s*=\s*new\s+THREE\.Group/g;
+          var matches = [];
+          var match;
+          while ((match = varPattern.exec(code)) !== null) {
+            matches.push(match[2]);
+          }
+          return matches;
+        }
+
+        function executeWithFallback(code, varNames) {
+          for (var i = 0; i < varNames.length; i++) {
+            try {
+              var varName = varNames[i];
+              var fn = new Function('THREE', code + '\nreturn (typeof ' + varName + ' !== "undefined") ? ' + varName + ' : null;');
+              var result = fn(THREE);
+              if (result && result instanceof THREE.Group) {
+                console.log('[AI] Successfully returned variable: ' + varName);
+                return result;
+              }
+            } catch (e) {
+              console.warn('[AI] Failed to execute with variable ' + varNames[i] + ':', e.message);
+            }
+          }
+          return null;
+        }
+
+        async function rewriteToPlainJavaScript(inputCode) {
+          var rewritePrompt = [
+            'Convert the following content to executable plain JavaScript for Three.js.',
+            'Rules:',
+            '- Remove all TypeScript syntax (types, interfaces, generics, "as" assertions).',
+            '- Keep logic identical when possible.',
+            '- Keep THREE.js API usage intact.',
+            '- Output ONLY JavaScript statements (no prose, no explanations, no markdown).',
+            '- The result MUST define: var modelGroup = new THREE.Group();',
+            '- The result MUST end with: modelGroup;',
+            '',
+            inputCode,
+          ].join('\n');
+
+          var rewriteResp = await fetch('https://text.pollinations.ai/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: rewritePrompt }],
+              model: 'openai',
+              seed: Math.floor(Math.random() * 100000),
+              jsonMode: false,
+            }),
+          });
+
+          if (!rewriteResp.ok) {
+            throw new Error('Rewrite service error: ' + rewriteResp.status);
+          }
+
+          var rewritten = await rewriteResp.text();
+          rewritten = rewritten.replace(/```javascript\n?/g, '').replace(/```js\n?/g, '').replace(/```\n?/g, '').trim();
+          return rewritten;
+        }
+
+        async function rewriteWithLadder(inputCode, kind) {
+          var maxRewriteAttempts = 2;
+          console.log('[AI][PIPELINE] stage=rewrite-ladder start', { maxAttempts: maxRewriteAttempts });
+          for (var attempt = 0; attempt < maxRewriteAttempts; attempt++) {
+            try {
+              showAiStatus('🤖 Rewriting code (attempt ' + (attempt + 1) + '/' + maxRewriteAttempts + ')...', 'loading');
+              var rewritten = await rewriteToPlainJavaScript(inputCode);
+              var normalized = normalizeTopLevelReturn(rewritten, 'rewrite-attempt-' + (attempt + 1));
+              assertExecutableJsOrThrow(normalized, 'rewrite-response-' + (attempt + 1));
+              console.log('[AI][PIPELINE] stage=rewrite-ladder success', { attempt: attempt + 1 });
+              return normalized;
+            } catch (rewriteErr) {
+              console.warn('[AI] Rewrite attempt ' + (attempt + 1) + ' failed:', rewriteErr.message);
+            }
+          }
+          console.warn('[AI] All rewrite attempts exhausted, using deterministic fallback');
+          return buildDeterministicFallbackCode(kind || 'custom');
+        }
+
+        function buildDeterministicFallbackCode(kind) {
+          var normalizedKind = (kind || 'custom').toLowerCase();
+          return [
+            'var modelGroup = new THREE.Group();',
+            'var bodyMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.3, roughness: 0.6 });',
+            'var accentMat = new THREE.MeshStandardMaterial({ color: 0x3366ff, metalness: 0.2, roughness: 0.7 });',
+            normalizedKind === 'car'
+              ? 'var body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 1.2), bodyMat); body.position.y = 0.8; modelGroup.add(body);'
+              : 'var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.2), bodyMat); body.position.y = 0.9; modelGroup.add(body);',
+            'var top = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 1.0), accentMat); top.position.y = 1.45; modelGroup.add(top);',
+            'var wheelGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 20);',
+            'var wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });',
+            'for (var i = 0; i < 4; i++) {',
+            '  var w = new THREE.Mesh(wheelGeo, wheelMat);',
+            '  w.rotation.z = Math.PI / 2;',
+            '  w.position.set(i < 2 ? -0.8 : 0.8, 0.35, i % 2 === 0 ? -0.5 : 0.5);',
+            '  modelGroup.add(w);',
+            '}',
+            'modelGroup;',
+          ].join('\n');
+        }
+
+        try {
+          // Stage 1: Try raw code with modelGroup
+          var fn1 = new Function('THREE', code + '\nreturn (typeof modelGroup !== "undefined") ? modelGroup : null;');
+          modelGroup = fn1(THREE);
+          if (modelGroup && modelGroup instanceof THREE.Group) {
+            console.log('[AI] Stage 1: Raw code executed successfully with modelGroup');
+          } else {
+            // Fallback: scan for other Group variable names
+            console.log('[AI] modelGroup not found, scanning for other Group variables...');
+            var varNames = findGroupVariable(code);
+            console.log('[AI] Found potential Group variables:', varNames);
+            if (varNames.length > 0) {
+              modelGroup = executeWithFallback(code, varNames);
+            }
+          }
+        } catch (err1) {
+          console.warn('[AI] Stage 1 failed:', err1.message);
+          console.log('[AI] Stage 2: Cleaning TypeScript syntax...');
+
+          // Stage 2: Clean TS syntax and retry
+          var cleanedCode = cleanTypeScript(code);
+          console.log('[AI] Cleaned code preview:', cleanedCode.substring(0, 200));
+
+          try {
+            var fn2 = new Function('THREE', cleanedCode + '\nreturn (typeof modelGroup !== "undefined") ? modelGroup : null;');
+            modelGroup = fn2(THREE);
+            if (modelGroup && modelGroup instanceof THREE.Group) {
+              console.log('[AI] Stage 2: Cleaned code executed successfully with modelGroup');
+            } else {
+              // Fallback: scan for other Group variable names
+              console.log('[AI] modelGroup not found in cleaned code, scanning for other Group variables...');
+              var varNames = findGroupVariable(cleanedCode);
+              console.log('[AI] Found potential Group variables:', varNames);
+              if (varNames.length > 0) {
+                modelGroup = executeWithFallback(cleanedCode, varNames);
+              }
+            }
+            if (!modelGroup) {
+              throw new Error('No valid THREE.Group found');
+            }
+          } catch (err2) {
+            console.error('[AI] Stage 2 failed:', err2.message);
+            console.error('[AI] Cleaned code:', cleanedCode);
+            // Stage 3: AI rewrite fallback for stubborn TS syntax
+            var msg = String(err2.message || '');
+            var shouldRewrite =
+              msg.indexOf("Unexpected token ':'") >= 0 ||
+              msg.indexOf('Unexpected identifier') >= 0 ||
+              msg.indexOf('Unexpected token') >= 0 ||
+              msg.indexOf('missing ) after argument list') >= 0;
+            if (shouldRewrite) {
+              console.warn('[AI] Stage 3: Rewriting code to plain JavaScript via AI...');
+              var rewritten = await rewriteToPlainJavaScript(cleanedCode);
+              var normalizedRewritten = normalizeTopLevelReturn(rewritten, 'stage3-rewritten');
+              console.log('[AI] Rewritten code preview:', normalizedRewritten.substring(0, 200));
+              assertExecutableJsOrThrow(normalizedRewritten, 'rewrite-response');
+
+              var fn3 = new Function('THREE', normalizedRewritten + '\nreturn (typeof modelGroup !== "undefined") ? modelGroup : null;');
+              modelGroup = fn3(THREE);
+
+              if (!modelGroup || !(modelGroup instanceof THREE.Group)) {
+                var vars3 = findGroupVariable(normalizedRewritten);
+                if (vars3.length > 0) {
+                  modelGroup = executeWithFallback(normalizedRewritten, vars3);
+                }
+              }
+
+              if (!modelGroup || !(modelGroup instanceof THREE.Group)) {
+                throw new Error('Code rewrite succeeded but no valid THREE.Group was found');
+              }
+            } else {
+              throw new Error('Code execution failed: ' + err2.message);
+            }
+          }
+        }
+
+        if (!modelGroup || !(modelGroup instanceof THREE.Group)) {
+          throw new Error('Generated code did not return a valid THREE.Group');
+        }
+
+        if (!modelGroup || !(modelGroup instanceof THREE.Group)) {
+          throw new Error('Generated code did not return a valid THREE.Group');
+        }
+
+        // Add to scene
+        const id = generateId();
+        const obj = {
+          id,
+          name: `AI: ${(prompt || modelType).substring(0, 30)}`,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          color: '#888888',
+          visible: true,
+          metalness: 0,
+          roughness: 0.5,
+          opacity: 1,
+        };
+        state.objects[id] = obj;
+        state.rootIds.push(id);
+        state.meshes[id] = modelGroup;
+        scene.add(modelGroup);
+        selectObject(id);
+        refreshHierarchy();
+        autoSave();
+
+        showAiStatus('✅ Model generated successfully!', 'success');
+        setTimeout(hideAiStatus, 3000);
+      } catch (err) {
+        showAiStatus('❌ ' + err.message, 'error');
+      }
+    });
+
+    // ─── Export ──────────────────────────────────────────────
+    document.getElementById('btnExport').addEventListener('click', () => {
+      setLoading(true);
+      const exportGroup = new THREE.Group();
+      exportGroup.name = state.sceneName;
+      state.rootIds.forEach((id) => {
+        const mesh = state.meshes[id];
+        if (mesh) exportGroup.add(mesh.clone(true));
+      });
+      new GLTFExporter().parse(exportGroup, (result) => {
+        const blob = new Blob([result], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = state.sceneName + '.glb';
+        a.click();
+        URL.revokeObjectURL(url);
+        setLoading(false);
+      }, (err) => {
+        alert('Export failed: ' + err.message);
+        setLoading(false);
+      }, { binary: true });
+    });
+
+    // ─── Transform Mode ─────────────────────────────────────
+    document.querySelectorAll('[data-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-mode]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.transformMode = btn.dataset.mode;
+        transformControls.setMode(state.transformMode);
+      });
+    });
+
+    // ─── Selection ──────────────────────────────────────────
+    function selectObject(id) {
+      state.selectedId = id;
+      if (id && state.meshes[id]) {
+        transformControls.attach(state.meshes[id]);
+      } else {
+        transformControls.detach();
+      }
+      refreshHierarchy();
+      updateInspector();
+    }
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const allMeshes = [];
+      state.rootIds.forEach((id) => {
+        const g = state.meshes[id];
+        if (g) g.traverse((child) => { if (child.isMesh) allMeshes.push(child); });
+      });
+      const hits = raycaster.intersectObjects(allMeshes, false);
+      if (hits.length > 0) {
+        let hitObj = hits[0].object;
+        // Walk up to find the root group
+        while (hitObj.parent && !state.rootIds.some((id) => state.meshes[id] === hitObj)) {
+          hitObj = hitObj.parent;
+        }
+        const foundId = state.rootIds.find((id) => state.meshes[id] === hitObj);
+        if (foundId) { selectObject(foundId); return; }
+      }
+      selectObject(null);
+    });
+
+    // ─── Hierarchy Panel ────────────────────────────────────
+    function refreshHierarchy() {
+      const list = document.getElementById('hierarchyList');
+      const empty = document.getElementById('hierarchyEmpty');
+      list.innerHTML = '';
+      if (state.rootIds.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      state.rootIds.forEach((id) => {
+        const obj = state.objects[id];
+        if (!obj) return;
+        const li = document.createElement('li');
+        li.className = 'hierarchy-item' + (state.selectedId === id ? ' selected' : '');
+        li.innerHTML = `
+          <span class="item-icon">${obj.visible ? '👁' : '👁‍🗨'}</span>
+          <span class="item-name">${obj.name}</span>
+          <div class="item-actions">
+            <button class="icon-btn" data-action="toggle" title="${obj.visible ? 'Hide' : 'Show'}">${obj.visible ? '👁' : '🚫'}</button>
+            <button class="icon-btn danger" data-action="delete" title="Delete">🗑</button>
+          </div>`;
+        li.addEventListener('click', (e) => {
+          if (e.target.closest('[data-action]')) return;
+          selectObject(id);
+        });
+        li.querySelector('[data-action="toggle"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          obj.visible = !obj.visible;
+          state.meshes[id].visible = obj.visible;
+          refreshHierarchy();
+        });
+        li.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeObject(id);
+        });
+        list.appendChild(li);
+      });
+    }
+
+    function removeObject(id) {
+      const mesh = state.meshes[id];
+      if (mesh) scene.remove(mesh);
+      delete state.objects[id];
+      delete state.meshes[id];
+      state.rootIds = state.rootIds.filter((i) => i !== id);
+      if (state.selectedId === id) selectObject(null);
+      refreshHierarchy();
+      autoSave();
+    }
+
+    // ─── Inspector ──────────────────────────────────────────
+    function updateInspector() {
+      const empty = document.getElementById('inspectorEmpty');
+      const fields = document.getElementById('inspectorFields');
+      if (!state.selectedId || !state.objects[state.selectedId]) {
+        empty.classList.remove('hidden');
+        fields.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      fields.classList.remove('hidden');
+      const obj = state.objects[state.selectedId];
+      document.getElementById('inputName').value = obj.name;
+      document.getElementById('posX').value = obj.position[0].toFixed(2);
+      document.getElementById('posY').value = obj.position[1].toFixed(2);
+      document.getElementById('posZ').value = obj.position[2].toFixed(2);
+      document.getElementById('rotX').value = ((obj.rotation[0] * 180) / Math.PI).toFixed(1);
+      document.getElementById('rotY').value = ((obj.rotation[1] * 180) / Math.PI).toFixed(1);
+      document.getElementById('rotZ').value = ((obj.rotation[2] * 180) / Math.PI).toFixed(1);
+      document.getElementById('sclX').value = obj.scale[0].toFixed(2);
+      document.getElementById('sclY').value = obj.scale[1].toFixed(2);
+      document.getElementById('sclZ').value = obj.scale[2].toFixed(2);
+      document.getElementById('inputColor').value = obj.color;
+      document.getElementById('inputColorHex').value = obj.color;
+    }
+
+    function applyColor(id, color) {
+      const mesh = state.meshes[id];
+      if (!mesh) return;
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((m) => {
+              const nm = m.clone();
+              if ('color' in nm) nm.color.set(color);
+              return nm;
+            });
+          } else {
+            const nm = child.material.clone();
+            if ('color' in nm) nm.color.set(color);
+            child.material = nm;
+          }
+        }
+      });
+    }
+
+    // Inspector input listeners
+    function onInspectorChange() {
+      if (!state.selectedId) return;
+      const obj = state.objects[state.selectedId];
+      const mesh = state.meshes[state.selectedId];
+      if (!obj || !mesh) return;
+
+      obj.name = document.getElementById('inputName').value;
+      obj.position = [
+        parseFloat(document.getElementById('posX').value) || 0,
+        parseFloat(document.getElementById('posY').value) || 0,
+        parseFloat(document.getElementById('posZ').value) || 0,
+      ];
+      obj.rotation = [
+        (parseFloat(document.getElementById('rotX').value) || 0) * Math.PI / 180,
+        (parseFloat(document.getElementById('rotY').value) || 0) * Math.PI / 180,
+        (parseFloat(document.getElementById('rotZ').value) || 0) * Math.PI / 180,
+      ];
+      obj.scale = [
+        parseFloat(document.getElementById('sclX').value) || 1,
+        parseFloat(document.getElementById('sclY').value) || 1,
+        parseFloat(document.getElementById('sclZ').value) || 1,
+      ];
+
+      mesh.position.set(...obj.position);
+      mesh.rotation.set(...obj.rotation);
+      mesh.scale.set(...obj.scale);
+
+      refreshHierarchy();
+      autoSave();
+    }
+
+    ['inputName', 'posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ', 'sclX', 'sclY', 'sclZ'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', onInspectorChange);
+    });
+
+    document.getElementById('inputColor').addEventListener('input', (e) => {
+      if (!state.selectedId) return;
+      const color = e.target.value;
+      state.objects[state.selectedId].color = color;
+      document.getElementById('inputColorHex').value = color;
+      applyColor(state.selectedId, color);
+      autoSave();
+    });
+
+    document.getElementById('inputColorHex').addEventListener('input', (e) => {
+      if (!state.selectedId) return;
+      const color = e.target.value;
+      if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+        state.objects[state.selectedId].color = color;
+        document.getElementById('inputColor').value = color;
+        applyColor(state.selectedId, color);
+        autoSave();
+      }
+    });
+
+    // ─── Color Palette ──────────────────────────────────────
+    const COLOR_PALETTE = [
+      '#FF0000', '#FF5722', '#FF9800', '#FFC107', '#FFEB3B', '#CDDC39',
+      '#8BC34A', '#4CAF50', '#009688', '#00BCD4', '#03A9F4', '#2196F3',
+      '#3F51B5', '#673AB7', '#9C27B0', '#E91E63', '#F44336', '#795548',
+      '#9E9E9E', '#607D8B', '#000000', '#FFFFFF', '#888888', '#333333',
+    ];
+
+    let recentColors = JSON.parse(localStorage.getItem('model-editor-recent-colors') || '[]');
+
+    function initColorPalette() {
+      const palette = document.getElementById('colorPalette');
+      palette.innerHTML = '';
+      COLOR_PALETTE.forEach((color) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = color;
+        swatch.title = color;
+        swatch.addEventListener('click', () => {
+          if (!state.selectedId) return;
+          state.objects[state.selectedId].color = color;
+          document.getElementById('inputColor').value = color;
+          document.getElementById('inputColorHex').value = color;
+          applyColor(state.selectedId, color);
+          addRecentColor(color);
+          autoSave();
+        });
+        palette.appendChild(swatch);
+      });
+    }
+
+    function addRecentColor(color) {
+      recentColors = recentColors.filter((c) => c !== color);
+      recentColors.unshift(color);
+      if (recentColors.length > 12) recentColors = recentColors.slice(0, 12);
+      localStorage.setItem('model-editor-recent-colors', JSON.stringify(recentColors));
+      renderRecentColors();
+    }
+
+    function renderRecentColors() {
+      const container = document.getElementById('recentColors');
+      container.innerHTML = '';
+      recentColors.forEach((color) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = color;
+        swatch.title = color;
+        swatch.addEventListener('click', () => {
+          if (!state.selectedId) return;
+          state.objects[state.selectedId].color = color;
+          document.getElementById('inputColor').value = color;
+          document.getElementById('inputColorHex').value = color;
+          applyColor(state.selectedId, color);
+          addRecentColor(color);
+          autoSave();
+        });
+        container.appendChild(swatch);
+      });
+    }
+
+    initColorPalette();
+    renderRecentColors();
+
+    // ─── Material Properties ────────────────────────────────
+    function applyMaterialProps(id) {
+      const mesh = state.meshes[id];
+      const obj = state.objects[id];
+      if (!mesh || !obj) return;
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          const applyToMat = (mat) => {
+            if ('metalness' in mat) mat.metalness = obj.metalness ?? 0;
+            if ('roughness' in mat) mat.roughness = obj.roughness ?? 0.5;
+            if ('opacity' in mat) {
+              mat.opacity = obj.opacity ?? 1;
+              mat.transparent = mat.opacity < 1;
+            }
+          };
+          if (Array.isArray(child.material)) {
+            child.material.forEach(applyToMat);
+          } else {
+            applyToMat(child.material);
+          }
+        }
+      });
+    }
+
+    document.getElementById('inputMetalness').addEventListener('input', (e) => {
+      if (!state.selectedId) return;
+      const val = parseFloat(e.target.value);
+      state.objects[state.selectedId].metalness = val;
+      document.getElementById('metalnessVal').textContent = val.toFixed(2);
+      applyMaterialProps(state.selectedId);
+      autoSave();
+    });
+
+    document.getElementById('inputRoughness').addEventListener('input', (e) => {
+      if (!state.selectedId) return;
+      const val = parseFloat(e.target.value);
+      state.objects[state.selectedId].roughness = val;
+      document.getElementById('roughnessVal').textContent = val.toFixed(2);
+      applyMaterialProps(state.selectedId);
+      autoSave();
+    });
+
+    document.getElementById('inputOpacity').addEventListener('input', (e) => {
+      if (!state.selectedId) return;
+      const val = parseFloat(e.target.value);
+      state.objects[state.selectedId].opacity = val;
+      document.getElementById('opacityVal').textContent = val.toFixed(2);
+      applyMaterialProps(state.selectedId);
+      autoSave();
+    });
+
+    // ─── Mesh Parts Coloring ────────────────────────────────
+    let selectedMeshPart = null;
+
+    function refreshMeshParts() {
+      const list = document.getElementById('meshPartsList');
+      list.innerHTML = '';
+      if (!state.selectedId) return;
+      const mesh = state.meshes[state.selectedId];
+      if (!mesh) return;
+      let partIdx = 0;
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          const idx = partIdx++;
+          const div = document.createElement('div');
+          div.className = 'mesh-part-item' + (selectedMeshPart === idx ? ' selected' : '');
+          const color = child.material && !Array.isArray(child.material) && child.material.color
+            ? '#' + child.material.color.getHexString()
+            : '#888888';
+          div.innerHTML = `
+            <div class="mesh-part-color" style="background:${color}"></div>
+            <span class="mesh-part-name">${child.name || 'Part ' + idx}</span>`;
+          div.addEventListener('click', () => {
+            selectedMeshPart = idx;
+            refreshMeshParts();
+          });
+          list.appendChild(div);
+        }
+      });
+    }
+
+    function applyColorToMeshPart(id, partIndex, color) {
+      const mesh = state.meshes[id];
+      if (!mesh) return;
+      let idx = 0;
+      mesh.traverse((child) => {
+        if (child.isMesh) {
+          if (idx === partIndex) {
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((m) => {
+                const nm = m.clone();
+                if ('color' in nm) nm.color.set(color);
+                return nm;
+              });
+            } else {
+              const nm = child.material.clone();
+              if ('color' in nm) nm.color.set(color);
+              child.material = nm;
+            }
+          }
+          idx++;
+        }
+      });
+    }
+
+    // Override color apply to support mesh parts
+    const origApplyColor = applyColor;
+    applyColor = function (id, color) {
+      if (selectedMeshPart !== null) {
+        applyColorToMeshPart(id, selectedMeshPart, color);
+        refreshMeshParts();
+      } else {
+        origApplyColor(id, color);
+      }
+    };
+
+    // Update mesh parts when selection changes
+    const origUpdateInspector = updateInspector;
+    updateInspector = function () {
+      origUpdateInspector();
+      selectedMeshPart = null;
+      refreshMeshParts();
+      // Update material sliders
+      if (state.selectedId && state.objects[state.selectedId]) {
+        const obj = state.objects[state.selectedId];
+        document.getElementById('inputMetalness').value = obj.metalness ?? 0;
+        document.getElementById('metalnessVal').textContent = (obj.metalness ?? 0).toFixed(2);
+        document.getElementById('inputRoughness').value = obj.roughness ?? 0.5;
+        document.getElementById('roughnessVal').textContent = (obj.roughness ?? 0.5).toFixed(2);
+        document.getElementById('inputOpacity').value = obj.opacity ?? 1;
+        document.getElementById('opacityVal').textContent = (obj.opacity ?? 1).toFixed(2);
+      }
+    };
+
+    // ─── Save / Load ────────────────────────────────────────
+    const STORAGE_KEY = 'model-editor-scenes';
+    const AUTOSAVE_KEY = 'model-editor-autosave';
+
+    function getSavedScenes() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+    }
+
+    function saveScenesList(scenes) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenes));
+    }
+
+    function serializeScene() {
+      return {
+        id: state.sceneId,
+        name: state.sceneName,
+        objects: state.objects,
+        rootIds: state.rootIds,
+        savedAt: Date.now(),
+      };
+    }
+
+    function deserializeScene(data) {
+      // Clear current
+      state.rootIds.forEach((id) => {
+        if (state.meshes[id]) scene.remove(state.meshes[id]);
+      });
+      state.objects = {};
+      state.meshes = {};
+      state.rootIds = [];
+      state.selectedId = null;
+      transformControls.detach();
+
+      state.sceneId = data.id;
+      state.sceneName = data.name || 'Untitled Scene';
+
+      // We can only restore metadata; meshes need to be re-imported.
+      // For saved scenes with mesh data, we store a simplified representation.
+      // For MVP, we just restore object metadata (no mesh geometry persistence).
+      alert('Scene metadata loaded. Please re-import your model files to restore geometry.');
+      refreshHierarchy();
+      updateInspector();
+    }
+
+    document.getElementById('btnSave').addEventListener('click', () => {
+      const scenes = getSavedScenes();
+      const data = serializeScene();
+      const idx = scenes.findIndex((s) => s.id === data.id);
+      if (idx >= 0) scenes[idx] = data;
+      else scenes.push(data);
+      saveScenesList(scenes);
+      alert('Scene saved!');
+    });
+
+    document.getElementById('btnSaveScene').addEventListener('click', () => {
+      const name = document.getElementById('sceneNameInput').value.trim() || state.sceneName || 'Untitled Scene';
+      state.sceneName = name;
+      const scenes = getSavedScenes();
+      const data = serializeScene();
+      const idx = scenes.findIndex((s) => s.id === data.id);
+      if (idx >= 0) scenes[idx] = data;
+      else scenes.push(data);
+      saveScenesList(scenes);
+      document.getElementById('sceneNameInput').value = '';
+      refreshScenesList();
+      alert('Scene "' + name + '" saved!');
+    });
+
+    function refreshScenesList() {
+      const list = document.getElementById('scenesList');
+      const scenes = getSavedScenes();
+      list.innerHTML = '';
+      if (scenes.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>No saved scenes</p></div>';
+        return;
+      }
+      scenes.forEach((s) => {
+        const div = document.createElement('div');
+        div.className = 'scene-item';
+        div.innerHTML = `
+          <div class="scene-info">
+            <span class="scene-name">${s.name}</span>
+            <span class="scene-date">${new Date(s.savedAt).toLocaleDateString()}</span>
+          </div>
+          <div class="scene-actions">
+            <button class="toolbar-btn small" data-action="load">Load</button>
+            <button class="toolbar-btn small danger" data-action="del">🗑</button>
+          </div>`;
+        div.querySelector('[data-action="load"]').addEventListener('click', () => {
+          deserializeScene(s);
+        });
+        div.querySelector('[data-action="del"]').addEventListener('click', () => {
+          if (confirm('Delete scene "' + s.name + '"?')) {
+            const updated = getSavedScenes().filter((sc) => sc.id !== s.id);
+            saveScenesList(updated);
+            refreshScenesList();
+          }
+        });
+        list.appendChild(div);
+      });
+    }
+
+    function autoSave() {
+      try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serializeScene())); } catch { }
+    }
+
+    // Load autosave on start
+    try {
+      const auto = JSON.parse(localStorage.getItem(AUTOSAVE_KEY));
+      if (auto && auto.rootIds && auto.rootIds.length > 0) {
+        state.sceneId = auto.id;
+        state.sceneName = auto.name || 'Untitled Scene';
+      }
+    } catch { }
+
+    refreshScenesList();
+    refreshHierarchy();
+  </script>
+</body>
+
+</html>
